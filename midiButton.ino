@@ -16,6 +16,10 @@ const int channel = 1;
 // automatically deals with contact chatter or "bounce", and
 // it makes detecting changes very simple.
 Bounce button0 = Bounce(0, 5);
+unsigned long holdTime = 5000; //hold time in ms for second midi to trigger
+unsigned long currentTime = 0;
+bool isDown = false;
+bool isSent = false;
 
 
 void setup() {
@@ -40,15 +44,16 @@ void loop() {
   button0.update();
 
   // Check each button for "falling" edge.
-  // Send a MIDI Note On message when each button presses
-  // Update the Joystick buttons only upon changes.
+  // Send a MIDI Note On message when the button is presses
   // falling = high (not pressed - voltage from pullup resistor)
   //           to low (pressed - button connects pin to ground)
   if (button0.fallingEdge()) {
     usbMIDI.sendNoteOn(60, 99, channel);  // 60 = C4
+    currentTime = millis();
+    isDown = true;
   }
-  
-  // Check each button for "rising" edge
+
+  // Check the button for "rising" edge
   // Send a MIDI Note Off message when each button releases
   // For many types of projects, you only care when the button
   // is pressed and the release isn't needed.
@@ -56,13 +61,22 @@ void loop() {
   //          to high (not pressed - voltage from pullup resistor)
   if (button0.risingEdge()) {
     usbMIDI.sendNoteOff(60, 0, channel);  // 60 = C4
+    usbMIDI.sendNoteOn(61, 99, channel);
+    isDown = false;
+    isSent = false;
   }
- 
+
 
   // MIDI Controllers should discard incoming MIDI messages.
   // http://forum.pjrc.com/threads/24179-Teensy-3-Ableton-Analog-CC-causes-midi-crash
   while (usbMIDI.read()) {
     // ignore incoming messages
   }
-}
 
+  if (isDown == true && isSent == false) {
+    if (millis()-currentTime > holdTime) {
+      usbMIDI.sendNoteOn(61, 99, channel);
+      isSent = true;
+    }
+  }
+}
